@@ -13,21 +13,29 @@ import {
   X,
   Maximize2,
   ZoomIn,
-  ZoomOut
+  ZoomOut,
+  Lock,
+  User,
+  ArrowRight
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 // --- CONFIGURACIÓN DE SUPABASE ---
-// Inicialización local para evitar errores de resolución de módulos externos en el entorno de previsualización
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 export default function AdminPage() {
+  // --- ESTADOS DE AUTENTICACIÓN ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loginError, setLoginError] = useState('')
+
   // --- CONFIGURACIÓN ---
   const CAMPAIGN_NAME = process.env.NEXT_PUBLIC_CAMPAIGN || ''
 
-  // --- ESTADOS ---
+  // --- ESTADOS DE LA APP ---
   const [campaign, setCampaign] = useState<any>(null)
   const [registrations, setRegistrations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,11 +46,25 @@ export default function AdminPage() {
   const [winner, setWinner] = useState<any>(null)
 
   // Estado del Modal de Imagen
-  const [selectedImage, setSelectedImage] = useState(null)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isZoomed, setIsZoomed] = useState(false)
 
-  // --- CARGA INICIAL ---
+  // --- LÓGICA DE LOGIN ---
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (username === 'adminMonster' && password === 'MONSTER$$2026') {
+      setIsAuthenticated(true)
+      setLoginError('')
+    } else {
+      setLoginError('Usuario o contraseña incorrectos')
+      // Pequeña animación de error (shake) podría ir aquí mediante clases CSS si se desea
+    }
+  }
+
+  // --- CARGA INICIAL (Solo si está autenticado) ---
   useEffect(() => {
+    if (!isAuthenticated) return
+
     const initAdmin = async () => {
       if (!supabaseUrl || !supabaseAnonKey) {
         console.error("Supabase credentials missing")
@@ -52,7 +74,6 @@ export default function AdminPage() {
 
       setLoading(true)
       try {
-        // 1. Obtener ID de la campaña desde el ENV
         const { data: campData, error: campError } = await supabase
           .from('campaigns')
           .select('*')
@@ -61,7 +82,6 @@ export default function AdminPage() {
 
         if (campData) {
           setCampaign(campData)
-          // 2. Cargar registros de esa campaña
           const { data: regData, error: regError } = await supabase
             .from('registrations')
             .select('*')
@@ -78,7 +98,7 @@ export default function AdminPage() {
     }
 
     initAdmin()
-  }, [CAMPAIGN_NAME])
+  }, [CAMPAIGN_NAME, isAuthenticated])
 
   // --- ACCIONES ---
   const handleExportExcel = () => {
@@ -89,7 +109,6 @@ export default function AdminPage() {
         'Nombre Completo': reg.full_name,
         'DNI/ID': reg.dni || 'N/A',
         'Teléfono': reg.phone,
-       
         'Fecha': new Date(reg.created_at).toLocaleString('es-PE'),
         'Link Voucher': reg.voucher_url
       }))
@@ -123,7 +142,6 @@ export default function AdminPage() {
     }, 80)
   }
 
-  // Filtrado por búsqueda
   const filteredRegistrations = registrations.filter(r => 
     r.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     r.dni?.includes(searchTerm) ||
@@ -135,10 +153,81 @@ export default function AdminPage() {
     setIsZoomed(false)
   }
 
+  // --- RENDER DE LOGIN (ESTILO APPLE) ---
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#f5f5f7] dark:bg-black font-sans p-4">
+        <div className="w-full max-w-[380px] animate-in fade-in slide-in-from-bottom-4 duration-700">
+          
+          <div className="flex justify-center mb-8">
+            <div className="w-16 h-16 bg-white dark:bg-zinc-900 rounded-[1.5rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] flex items-center justify-center border border-black/5 dark:border-white/5">
+              <Lock className="text-zinc-800 dark:text-zinc-200" size={28} strokeWidth={1.5} />
+            </div>
+          </div>
+
+          <div className="bg-white/70 dark:bg-zinc-900/60 backdrop-blur-2xl p-8 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-white/40 dark:border-white/10">
+            <h2 className="text-2xl font-semibold tracking-tight text-center text-zinc-900 dark:text-zinc-100 mb-2">
+              Iniciar Sesión
+            </h2>
+            <p className="text-center text-sm text-zinc-500 mb-8">
+              Portal de Administración Monster
+            </p>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-3">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <User size={18} className="text-zinc-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Usuario"
+                    className="w-full bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all placeholder:text-zinc-500 text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+                
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Lock size={18} className="text-zinc-400" />
+                  </div>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Contraseña"
+                    className="w-full bg-black/5 dark:bg-white/5 border border-transparent focus:border-black/20 dark:focus:border-white/20 focus:bg-white dark:focus:bg-zinc-800 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none transition-all placeholder:text-zinc-500 text-zinc-900 dark:text-zinc-100"
+                    required
+                  />
+                </div>
+              </div>
+
+              {loginError && (
+                <p className="text-[#e53829] text-xs text-center font-medium animate-in fade-in">
+                  {loginError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-black dark:bg-white text-white dark:text-black rounded-2xl py-3.5 font-medium text-sm flex items-center justify-center gap-2 hover:opacity-90 active:scale-[0.98] transition-all mt-4"
+              >
+                Continuar <ArrowRight size={16} />
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- RENDER DEL DASHBOARD ---
   if (loading && !campaign) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#88c641] gap-4">
-        <Loader2 className="animate-spin text-[#e53829]" size={48} />
+      <div className="h-screen w-full flex flex-col items-center justify-center bg-black gap-4">
+        <Loader2 className="animate-spin text-white" size={48} />
         <p className="font-black uppercase tracking-widest text-xs text-zinc-400">Autenticando Campaña...</p>
       </div>
     )
@@ -148,16 +237,16 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[#88c641] dark:bg-black font-sans text-zinc-900 dark:text-zinc-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* HEADER LOCKADO A CAMPAIGN */}
+        {/* HEADER */}
         <header className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 border-b border-zinc-200 dark:border-zinc-800 pb-8">
           <div className="space-y-1">
             <h1 className="text-4xl font-black uppercase tracking-tighter leading-none flex items-center gap-3">
-              <Gift className="text-[#88c641]" size={32} />
-              Admin <span className="text-[#88c641]">Promo Monster Oxxo</span>
+              <Gift className="text-zinc-900 dark:text-[#88c641]" size={32} />
+              Admin <span className="text-zinc-900 dark:text-[#88c641]">Promo Monster Oxxo</span>
             </h1>
             <div className="flex items-center gap-2 mt-2">
               <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse"></div>
-              <p className="text-zinc-500 text-xs font-black uppercase tracking-[0.2em]">Campaña Activa: {CAMPAIGN_NAME}</p>
+              <p className="text-zinc-700 dark:text-zinc-500 text-xs font-black uppercase tracking-[0.2em]">Campaña Activa: {CAMPAIGN_NAME || 'Global'}</p>
             </div>
           </div>
 
@@ -168,6 +257,12 @@ export default function AdminPage() {
               className="flex-1 sm:flex-none bg-zinc-900 dark:bg-white text-white dark:text-black px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl disabled:opacity-50"
             >
               <Download size={16} strokeWidth={3} /> Excel
+            </button>
+            <button 
+              onClick={() => setIsAuthenticated(false)}
+              className="flex-1 sm:flex-none bg-white dark:bg-zinc-900 text-black dark:text-white border border-transparent dark:border-zinc-800 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-sm"
+            >
+              Salir
             </button>
           </div>
         </header>
@@ -275,7 +370,6 @@ export default function AdminPage() {
                           <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest truncate">
                             • {reg.phone}
                           </p>
-                          
                         </div>
                       </div>
                       
@@ -308,21 +402,17 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* MODAL DE PREVISUALIZACIÓN DE VOUCHER MEJORADO */}
+      {/* MODAL DE PREVISUALIZACIÓN DE VOUCHER */}
       {selectedImage && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8 animate-in fade-in duration-300"
         >
-          {/* Backdrop con Blur más fuerte */}
           <div 
             className="absolute inset-0 bg-black/95 backdrop-blur-xl"
             onClick={closeImageModal}
           ></div>
           
-          {/* Contenido del Modal Mejorado */}
           <div className="relative w-full max-w-4xl h-[85vh] flex flex-col items-center justify-center animate-in zoom-in duration-300">
-            
-            {/* Botón de Cerrar */}
             <button 
               onClick={closeImageModal}
               className="absolute -top-4 -right-4 z-[110] bg-white text-black p-3 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all hover:bg-[#e53829] hover:text-white"
@@ -330,7 +420,6 @@ export default function AdminPage() {
               <X size={24} strokeWidth={3} />
             </button>
             
-            {/* Contenedor de Imagen con Zoom */}
             <div 
               className={`relative w-full h-full bg-zinc-900 rounded-[2.5rem] overflow-hidden flex items-center justify-center border border-white/10 shadow-2xl cursor-pointer`}
               onClick={() => setIsZoomed(!isZoomed)}
@@ -341,13 +430,11 @@ export default function AdminPage() {
                  alt="Voucher Preview" 
                />
                
-               {/* Badge de Zoom */}
                <div className="absolute bottom-6 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/20 text-white text-[10px] font-black uppercase tracking-widest flex items-center gap-2 pointer-events-none">
                   {isZoomed ? <><ZoomOut size={14}/> Click para alejar</> : <><ZoomIn size={14}/> Click para zoom</>}
                </div>
             </div>
             
-            {/* Footer del Modal */}
             <div className="mt-6 flex gap-4 w-full justify-center">
               <a 
                 href={selectedImage} 
